@@ -45,7 +45,7 @@ jgl exec -g work git push
 
 ## Tech stack
 
-Rust, single binary, no runtime deps. See [docs/design.md](docs/design.md) for architecture and design decisions.
+Rust, single binary, no runtime deps. See [docs/design.md](docs/design.md) for architecture and [docs/plan-basics.md](docs/plan-basics.md) for the implementation plan.
 
 ## License
 
