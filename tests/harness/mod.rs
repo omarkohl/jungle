@@ -67,6 +67,8 @@ impl TestRepo {
         for name in &self.remotes {
             let remote_path = base.join(format!("{repo_name}-remote-{name}"));
             run_checked(Command::new("git").args([
+                "-c",
+                "init.defaultBranch=main",
                 "init",
                 "--bare",
                 remote_path.to_str().unwrap(),
