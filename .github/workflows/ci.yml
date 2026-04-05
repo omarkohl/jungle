@@ -16,6 +16,9 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: jj
       - run: cargo nextest run
       - uses: EmbarkStudios/cargo-deny-action@v2
 
