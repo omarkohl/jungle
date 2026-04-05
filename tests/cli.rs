@@ -62,5 +62,5 @@ fn add_valid_repo_updates_config() {
 fn fetch_with_no_config_succeeds() {
     let tmp = TempDir::new().unwrap();
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::fetch::run(&config_path).unwrap();
+    jungle::commands::fetch::run(&config_path, false).unwrap();
 }

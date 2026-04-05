@@ -15,5 +15,9 @@ pub enum Command {
         path: String,
     },
     /// Run `jj git fetch` in all registered repositories
-    Fetch,
+    Fetch {
+        /// Show full jj output for each repository
+        #[arg(short, long)]
+        verbose: bool,
+    },
 }
