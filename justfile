@@ -8,6 +8,10 @@ check:
 fmt:
     cargo fmt
 
+# Run integration tests only
+integration:
+    cargo nextest run --test integration
+
 # Run tests in watch mode
 dev:
     bacon test
