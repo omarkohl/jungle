@@ -16,7 +16,18 @@ pub fn run() -> Result<()> {
 
     match cli.command {
         Command::Add { path } => commands::add::run(&config_path, &path),
-        Command::Fetch { verbose } => commands::fetch::run(&config_path, verbose),
+        Command::Fetch {
+            verbose,
+            rebase,
+            with_conflicts,
+        } => commands::fetch::run(
+            &config_path,
+            &commands::fetch::FetchOptions {
+                verbose,
+                rebase,
+                with_conflicts,
+            },
+        ),
     }
 }
 

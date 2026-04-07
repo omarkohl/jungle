@@ -19,5 +19,11 @@ pub enum Command {
         /// Show full jj output for each repository
         #[arg(short, long)]
         verbose: bool,
+        /// Rebase working-copy branch onto `trunk()` after each fetch
+        #[arg(long)]
+        rebase: bool,
+        /// Keep rebase even if it introduces conflicts (requires --rebase)
+        #[arg(long, requires = "rebase")]
+        with_conflicts: bool,
     },
 }

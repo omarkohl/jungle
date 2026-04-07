@@ -64,7 +64,15 @@ fn fetch_pulls_commits_pushed_by_clone() {
         .contains(&"feat: add feature".to_owned()));
 
     // Run jgl fetch
-    jungle::commands::fetch::run(&config_path, false).unwrap();
+    jungle::commands::fetch::run(
+        &config_path,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
+    )
+    .unwrap();
 
     // After fetch: repo sees the new commit
     assert!(repo
@@ -99,7 +107,15 @@ fn fetch_multiple_repos_all_updated() {
     clone_b.commit("feat: from clone b", &[("new_b.txt", "y")]);
     clone_b.push("origin");
 
-    jungle::commands::fetch::run(&config_path, false).unwrap();
+    jungle::commands::fetch::run(
+        &config_path,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
+    )
+    .unwrap();
 
     assert!(repo_a
         .log_messages()
@@ -122,7 +138,15 @@ fn fetch_fails_when_repo_is_deleted() {
 
     std::fs::remove_dir_all(repo.path()).unwrap();
 
-    let err = jungle::commands::fetch::run(&config_path, false).unwrap_err();
+    let err = jungle::commands::fetch::run(
+        &config_path,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("failed"));
 }
 
@@ -140,7 +164,15 @@ fn fetch_fails_when_remote_is_deleted() {
     // Remove the bare remote so fetch has nowhere to pull from
     std::fs::remove_dir_all(repo.remote_path("origin")).unwrap();
 
-    let err = jungle::commands::fetch::run(&config_path, false).unwrap_err();
+    let err = jungle::commands::fetch::run(
+        &config_path,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("failed"));
 }
 
@@ -173,7 +205,15 @@ fn fetch_continues_after_partial_failure() {
     std::fs::remove_dir_all(repo_a.path()).unwrap();
 
     // run() should report failure (repo_a errored)
-    let err = jungle::commands::fetch::run(&config_path, false).unwrap_err();
+    let err = jungle::commands::fetch::run(
+        &config_path,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("failed"));
 
     // repo_b must still have been fetched despite repo_a failing
@@ -209,6 +249,11 @@ fn fetch_result_shows_changed_and_unchanged() {
     let results = jungle::commands::fetch::run_with_results(
         &config_path,
         &jungle::commands::fetch::ProcessRunner,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
     )
     .unwrap();
 
@@ -246,6 +291,11 @@ fn fetch_labels_repos_by_dirname() {
     let results = jungle::commands::fetch::run_with_results(
         &config_path,
         &jungle::commands::fetch::ProcessRunner,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
     )
     .unwrap();
 
@@ -279,6 +329,11 @@ fn fetch_disambiguates_same_dirname() {
     let results = jungle::commands::fetch::run_with_results(
         &config_path,
         &jungle::commands::fetch::ProcessRunner,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: false,
+            with_conflicts: false,
+        },
     )
     .unwrap();
 
