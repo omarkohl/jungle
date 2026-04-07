@@ -31,28 +31,6 @@ jgl fetch         # run `jj git fetch` in all registered repos
 
 Config is stored at `~/.config/jungle/config.toml` (Linux/XDG) or the platform equivalent.
 
-## Development
-
-Requirements: Rust stable (≥ 1.80), [`just`](https://github.com/casey/just), [`cargo-nextest`](https://nexte.st).
-
-```sh
-# run all checks (mirrors CI)
-just check
-
-# format
-just fmt
-
-# watch mode (requires bacon)
-just dev
-```
-
-Run tests directly:
-
-```sh
-cargo test
-cargo nextest run   # parallel, better output
-```
-
 ## Features
 
 **Repo registry** — register repos individually or in groups:
@@ -90,6 +68,10 @@ jgl exec -g work git push
 ## Tech stack
 
 Rust, single binary, no runtime deps. See [docs/design.md](docs/design.md) for architecture and [docs/plan-basics.md](docs/plan-basics.md) for the implementation plan.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
