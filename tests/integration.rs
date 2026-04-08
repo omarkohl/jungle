@@ -303,6 +303,77 @@ fn fetch_labels_repos_by_dirname() {
 }
 
 #[test]
+fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
+    // Scenario:
+    //   - origin/main is advanced by a clone (so fetch sees changes)
+    //   - local repo has a "feature" commit pushed to origin/feature
+    //     (making it immutable via untracked_remote_bookmarks())
+    //   - @ (working change) sits on top of that immutable feature commit
+    //   - jgl fetch --rebase calls `jj rebase -o trunk()` which must
+    //     traverse the immutable feature commit → jj refuses → Failed
+    let tmp = TempDir::new().unwrap();
+    let repo = TestRepo::new(tmp.path().join("repo"))
+        .with_remote("origin")
+        .with_commit("initial", &[("README.md", "# Hello")])
+        .build();
+
+    let config_path = tmp.path().join("config.toml");
+    jungle::commands::add::run(&config_path, repo.path().to_str().unwrap()).unwrap();
+
+    // Advance origin/main via a clone so trunk() will move after fetch
+    let clone = repo.clone_as(tmp.path().join("clone"));
+    clone.commit("feat: remote progress", &[("remote.txt", "x")]);
+    clone.push("origin");
+
+    // In the local repo: create a commit, push it as "feature" bookmark, then
+    // untrack it so feature@origin becomes an untracked remote bookmark and the
+    // commit falls into immutable_heads() via untracked_remote_bookmarks().
+    std::fs::write(repo.path().join("feature.txt"), "feature work").unwrap();
+    repo.run_jj(&["commit", "-m", "feat: local feature"]);
+    repo.run_jj(&["bookmark", "create", "feature", "-r", "@-"]);
+    repo.run_jj(&["git", "push", "--remote", "origin", "-b", "feature"]);
+    repo.run_jj(&["bookmark", "untrack", "feature", "--remote=origin"]);
+
+    // Add a working change on top of the now-immutable feature commit
+    std::fs::write(repo.path().join("wip.txt"), "wip").unwrap();
+
+    // fetch --rebase: fetch succeeds (origin/main advanced), then
+    // `jj rebase -b @ -o trunk()` fails because @- is immutable and not in main
+    let results = jungle::commands::fetch::run_with_results(
+        &config_path,
+        &jungle::commands::fetch::ProcessRunner,
+        &jungle::commands::fetch::FetchOptions {
+            verbose: false,
+            rebase: true,
+            with_conflicts: false,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert!(
+        matches!(
+            results[0].rebase_status,
+            jungle::commands::fetch::RebaseStatus::Failed(_)
+        ),
+        "expected rebase to fail when @ is on top of immutable commit not in main, got {:?}",
+        results[0].rebase_status
+    );
+
+    let mut out = Vec::<u8>::new();
+    let mut err = Vec::<u8>::new();
+    jungle::commands::fetch::display_results(&results, &mut out, &mut err).unwrap();
+    let stdout = String::from_utf8(out).unwrap();
+    let stderr = String::from_utf8(err).unwrap();
+
+    assert!(
+        stdout.contains("(rebase failed)"),
+        "stdout should contain '(rebase failed)': {stdout:?}"
+    );
+    assert!(stderr.is_empty(), "stderr should be empty, got: {stderr:?}");
+}
+
+#[test]
 fn fetch_disambiguates_same_dirname() {
     let tmp = TempDir::new().unwrap();
 

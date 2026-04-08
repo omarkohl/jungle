@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::thread;
 
@@ -345,18 +346,24 @@ const fn rebase_suffix(fetch: &FetchStatus, rebase: &RebaseStatus) -> &'static s
     }
 }
 
-fn display_results(results: &[FetchResult]) {
+/// # Errors
+/// Returns an error if writing to `out` or `err` fails.
+pub fn display_results(
+    results: &[FetchResult],
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> std::io::Result<()> {
     for result in results {
         let suffix = rebase_suffix(&result.status, &result.rebase_status);
         match &result.status {
-            FetchStatus::Changed => println!("  changed    {}{suffix}", result.label),
-            FetchStatus::Unchanged => println!("  unchanged  {}{suffix}", result.label),
-            FetchStatus::Failed(e) => eprintln!("  error      {}: {e}", result.label),
-        }
-        if let RebaseStatus::Failed(e) = &result.rebase_status {
-            eprintln!("  rebase error {}: {e}", result.label);
+            FetchStatus::Changed => writeln!(out, "  changed    {}{suffix}", result.label)?,
+            FetchStatus::Unchanged => {
+                writeln!(out, "  unchanged  {}{suffix}", result.label)?;
+            }
+            FetchStatus::Failed(e) => writeln!(err, "  error      {}: {e}", result.label)?,
         }
     }
+    Ok(())
 }
 
 /// # Errors
@@ -379,9 +386,12 @@ pub fn run(config_path: &Path, opts: &FetchOptions) -> Result<()> {
                 FetchStatus::Unchanged => println!("  unchanged  {}{suffix}", result.label),
                 FetchStatus::Failed(e) => eprintln!("  error      {}: {e}", result.label),
             }
+            if let RebaseStatus::Failed(e) = &result.rebase_status {
+                eprintln!("  rebase error {}: {e}", result.label);
+            }
         }
     } else {
-        display_results(&results);
+        display_results(&results, &mut std::io::stdout(), &mut std::io::stderr())?;
     }
 
     let failures = results
