@@ -857,9 +857,9 @@ mod tests {
 
     #[test]
     fn compute_labels_single_repo() {
-        let paths = vec![PathBuf::from("/home/user/projects/jungle")];
+        let paths = vec![PathBuf::from("/home/user/projects/jgl")];
         let labels = compute_labels(&paths);
-        assert_eq!(labels, vec!["jungle".to_owned()]);
+        assert_eq!(labels, vec!["jgl".to_owned()]);
     }
 
     #[test]

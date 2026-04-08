@@ -1,10 +1,13 @@
 [package]
-name = "jungle"
-version = "0.2.0-dev"
+name = "jgl"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.80"
 license = "MIT"
 description = "Multi-repo manager for jujutsu (jj)"
+repository = "https://github.com/omarkohl/jgl"
+keywords = ["jujutsu", "jj", "git", "vcs", "multi-repo"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "jgl"

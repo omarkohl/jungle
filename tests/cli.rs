@@ -29,7 +29,7 @@ fn help_flag() {
 #[test]
 fn add_nonexistent_path_fails() {
     jgl()
-        .args(["add", "/nonexistent/jungle-test-path-xyz"])
+        .args(["add", "/nonexistent/jgl-test-path-xyz"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -52,9 +52,9 @@ fn add_valid_repo_updates_config() {
     std::fs::create_dir_all(repo.join(".jj")).unwrap();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(&config_path, repo.to_str().unwrap(), &mut std::io::sink()).unwrap();
+    jgl::commands::add::run(&config_path, repo.to_str().unwrap(), &mut std::io::sink()).unwrap();
 
-    let config = jungle::config::Config::load(&config_path).unwrap();
+    let config = jgl::config::Config::load(&config_path).unwrap();
     assert_eq!(config.repos.len(), 1);
 }
 
@@ -62,9 +62,9 @@ fn add_valid_repo_updates_config() {
 fn fetch_with_no_config_succeeds() {
     let tmp = TempDir::new().unwrap();
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::fetch::run(
+    jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,

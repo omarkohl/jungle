@@ -15,14 +15,14 @@ fn add_real_jj_repo_registers_in_config() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
 
-    let config = jungle::config::Config::load(&config_path).unwrap();
+    let config = jgl::config::Config::load(&config_path).unwrap();
     assert_eq!(config.repos.len(), 1);
     assert_eq!(config.repos[0].path, repo.path().to_str().unwrap());
 }
@@ -36,14 +36,14 @@ fn add_repo_with_remote_registers_correctly() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
 
-    let config = jungle::config::Config::load(&config_path).unwrap();
+    let config = jgl::config::Config::load(&config_path).unwrap();
     assert_eq!(config.repos.len(), 1);
     // The remote path should exist and be a bare repo
     assert!(repo.remote_path("origin").join("HEAD").exists());
@@ -61,7 +61,7 @@ fn fetch_pulls_commits_pushed_by_clone() {
 
     // Register repo in config
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -79,9 +79,9 @@ fn fetch_pulls_commits_pushed_by_clone() {
         .contains(&"feat: add feature".to_owned()));
 
     // Run jgl fetch
-    jungle::commands::fetch::run(
+    jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -112,13 +112,13 @@ fn fetch_multiple_repos_all_updated() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_a.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_b.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -134,9 +134,9 @@ fn fetch_multiple_repos_all_updated() {
     clone_b.commit("feat: from clone b", &[("new_b.txt", "y")]);
     clone_b.push("origin");
 
-    jungle::commands::fetch::run(
+    jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -163,7 +163,7 @@ fn fetch_fails_when_repo_is_deleted() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -172,9 +172,9 @@ fn fetch_fails_when_repo_is_deleted() {
 
     std::fs::remove_dir_all(repo.path()).unwrap();
 
-    let err = jungle::commands::fetch::run(
+    let err = jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -195,7 +195,7 @@ fn fetch_fails_when_remote_is_deleted() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -205,9 +205,9 @@ fn fetch_fails_when_remote_is_deleted() {
     // Remove the bare remote so fetch has nowhere to pull from
     std::fs::remove_dir_all(repo.remote_path("origin")).unwrap();
 
-    let err = jungle::commands::fetch::run(
+    let err = jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -236,13 +236,13 @@ fn fetch_continues_after_partial_failure() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_a.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_b.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -258,9 +258,9 @@ fn fetch_continues_after_partial_failure() {
     std::fs::remove_dir_all(repo_a.path()).unwrap();
 
     // run() should report failure (repo_a errored)
-    let err = jungle::commands::fetch::run(
+    let err = jgl::commands::fetch::run(
         &config_path,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -293,13 +293,13 @@ fn fetch_result_shows_changed_and_unchanged() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_a.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_b.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -311,10 +311,10 @@ fn fetch_result_shows_changed_and_unchanged() {
     clone_a.commit("feat: new in a", &[("new.txt", "x")]);
     clone_a.push("origin");
 
-    let results = jungle::commands::fetch::run_with_results(
+    let results = jgl::commands::fetch::run_with_results(
         &config_path,
-        &jungle::commands::fetch::ProcessRunner,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::ProcessRunner,
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -326,16 +326,13 @@ fn fetch_result_shows_changed_and_unchanged() {
     let result_b = results.iter().find(|r| r.path == *repo_b.path()).unwrap();
 
     assert!(
-        matches!(
-            result_a.status,
-            jungle::commands::fetch::FetchStatus::Changed
-        ),
+        matches!(result_a.status, jgl::commands::fetch::FetchStatus::Changed),
         "repo_a should be Changed"
     );
     assert!(
         matches!(
             result_b.status,
-            jungle::commands::fetch::FetchStatus::Unchanged
+            jgl::commands::fetch::FetchStatus::Unchanged
         ),
         "repo_b should be Unchanged"
     );
@@ -351,17 +348,17 @@ fn fetch_labels_repos_by_dirname() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_a.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
 
-    let results = jungle::commands::fetch::run_with_results(
+    let results = jgl::commands::fetch::run_with_results(
         &config_path,
-        &jungle::commands::fetch::ProcessRunner,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::ProcessRunner,
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,
@@ -388,7 +385,7 @@ fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo.path().to_str().unwrap(),
         &mut std::io::sink(),
@@ -414,10 +411,10 @@ fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
 
     // fetch --rebase: fetch succeeds (origin/main advanced), then
     // `jj rebase -b @ -o trunk()` fails because @- is immutable and not in main
-    let results = jungle::commands::fetch::run_with_results(
+    let results = jgl::commands::fetch::run_with_results(
         &config_path,
-        &jungle::commands::fetch::ProcessRunner,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::ProcessRunner,
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: true,
             with_conflicts: false,
@@ -429,7 +426,7 @@ fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
     assert!(
         matches!(
             results[0].rebase_status,
-            jungle::commands::fetch::RebaseStatus::Failed(_)
+            jgl::commands::fetch::RebaseStatus::Failed(_)
         ),
         "expected rebase to fail when @ is on top of immutable commit not in main, got {:?}",
         results[0].rebase_status
@@ -437,7 +434,7 @@ fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
 
     let mut out = Vec::<u8>::new();
     let mut err = Vec::<u8>::new();
-    jungle::commands::fetch::display_results(&results, false, &mut out, &mut err).unwrap();
+    jgl::commands::fetch::display_results(&results, false, &mut out, &mut err).unwrap();
     let stdout = String::from_utf8(out).unwrap();
     let stderr = String::from_utf8(err).unwrap();
 
@@ -469,23 +466,23 @@ fn fetch_disambiguates_same_dirname() {
         .build();
 
     let config_path = tmp.path().join("config.toml");
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_a.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
-    jungle::commands::add::run(
+    jgl::commands::add::run(
         &config_path,
         repo_b.path().to_str().unwrap(),
         &mut std::io::sink(),
     )
     .unwrap();
 
-    let results = jungle::commands::fetch::run_with_results(
+    let results = jgl::commands::fetch::run_with_results(
         &config_path,
-        &jungle::commands::fetch::ProcessRunner,
-        &jungle::commands::fetch::FetchOptions {
+        &jgl::commands::fetch::ProcessRunner,
+        &jgl::commands::fetch::FetchOptions {
             verbose: false,
             rebase: false,
             with_conflicts: false,

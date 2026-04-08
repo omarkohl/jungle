@@ -65,8 +65,8 @@ pub fn run() -> Result<()> {
 fn config_path() -> Result<std::path::PathBuf> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "io".into(),
-        author: "jungle".into(),
-        app_name: "jungle".into(),
+        author: "jgl".into(),
+        app_name: "jgl".into(),
     })
     .map_err(|e| anyhow::anyhow!("failed to determine config dir: {e}"))?;
     Ok(strategy.config_dir().join("config.toml"))

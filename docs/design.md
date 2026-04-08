@@ -2,7 +2,7 @@
 
 ## Motivation
 
-Working across many jj repos means repeating the same commands (`jj git fetch`, `jj status`, `jj log`) in each one, and mentally tracking which repos have unpushed work or conflicts. There's no built-in way to get a bird's-eye view across repos the way tools like [myrepos](https://myrepos.branchable.com/) or [gita](https://github.com/nosarthur/gita) do for git. jungle fills that gap for jj.
+Working across many jj repos means repeating the same commands (`jj git fetch`, `jj status`, `jj log`) in each one, and mentally tracking which repos have unpushed work or conflicts. There's no built-in way to get a bird's-eye view across repos the way tools like [myrepos](https://myrepos.branchable.com/) or [gita](https://github.com/nosarthur/gita) do for git. jgl fills that gap for jj.
 
 ## Tech stack
 
@@ -11,7 +11,7 @@ Working across many jj repos means repeating the same commands (`jj git fetch`, 
 - CLI parsing: `clap`
 - Parallel execution: `rayon`
 - Terminal UI / table rendering: `comfy-table` or `tabled`
-- Config: `~/.config/jungle/config.toml` via `serde` + `toml`
+- Config: `~/.config/jgl/config.toml` via `serde` + `toml`
 - Shell out to `jj` binary (don't link against jj internals for now)
 
 ## MVP features
@@ -25,7 +25,7 @@ jgl remove <path>
 jgl list
 ```
 
-Config stored in `~/.config/jungle/config.toml`:
+Config stored in `~/.config/jgl/config.toml`:
 
 ```toml
 [[repos]]

@@ -11,8 +11,8 @@
 ## Setup
 
 ```sh
-git clone https://github.com/omarkohl/jungle
-cd jungle
+git clone https://github.com/omarkohl/jgl
+cd jgl
 cargo build
 ```
 
