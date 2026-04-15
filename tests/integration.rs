@@ -341,6 +341,7 @@ fn fetch_result_shows_changed_and_unchanged() {
                 jgl::commands::fetch::DEFAULT_IDLE_TIMEOUT_SECS,
             ),
         },
+        None,
     )
     .unwrap();
 
@@ -392,6 +393,7 @@ fn fetch_labels_repos_by_dirname() {
                 jgl::commands::fetch::DEFAULT_IDLE_TIMEOUT_SECS,
             ),
         },
+        None,
     )
     .unwrap();
 
@@ -455,6 +457,7 @@ fn fetch_rebase_fails_when_working_change_on_immutable_not_in_main() {
                 jgl::commands::fetch::DEFAULT_IDLE_TIMEOUT_SECS,
             ),
         },
+        None,
     )
     .unwrap();
 
@@ -530,6 +533,7 @@ fn fetch_disambiguates_same_dirname() {
                 jgl::commands::fetch::DEFAULT_IDLE_TIMEOUT_SECS,
             ),
         },
+        None,
     )
     .unwrap();
 

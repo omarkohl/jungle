@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::io::Write;
+use std::collections::{BTreeMap, HashMap};
+use std::io::{IsTerminal, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Output, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -26,6 +26,46 @@ impl std::fmt::Display for IdleTimeoutError {
 }
 
 impl std::error::Error for IdleTimeoutError {}
+
+pub enum ProgressMsg {
+    Started { index: usize, label: String },
+    Finished { index: usize },
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn progress_display_loop(rx: mpsc::Receiver<ProgressMsg>) {
+    let mut active: BTreeMap<usize, (String, Instant)> = BTreeMap::new();
+    let mut prev_lines: usize = 0;
+    let mut out = std::io::stdout();
+
+    loop {
+        match rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(ProgressMsg::Started { index, label }) => {
+                active.insert(index, (label, Instant::now()));
+            }
+            Ok(ProgressMsg::Finished { index }) => {
+                active.remove(&index);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+
+        if prev_lines > 0 {
+            write!(out, "\x1B[{prev_lines}A\x1B[J").ok();
+        }
+        for (label, start) in active.values() {
+            let elapsed = start.elapsed().as_secs();
+            writeln!(out, "  fetching   {label}... {elapsed}s").ok();
+        }
+        out.flush().ok();
+        prev_lines = active.len();
+    }
+
+    if prev_lines > 0 {
+        write!(out, "\x1B[{prev_lines}A\x1B[J").ok();
+        out.flush().ok();
+    }
+}
 
 /// Read from `reader` in a loop, appending to a buffer and updating the
 /// shared `last_activity` timestamp on every successful read.
@@ -335,6 +375,7 @@ pub fn run_with_results(
     config_path: &Path,
     runner: &impl CommandRunner,
     opts: &FetchOptions,
+    progress: Option<&mpsc::SyncSender<ProgressMsg>>,
 ) -> Result<Vec<FetchResult>> {
     let config = Config::load_or_default(config_path)?;
 
@@ -368,8 +409,15 @@ pub fn run_with_results(
             let handles: Vec<_> = (chunk_start..chunk_end)
                 .map(|i| {
                     let path = &repos[i];
+                    let label = labels[i].clone();
                     s.spawn(move || {
+                        if let Some(tx) = progress {
+                            tx.send(ProgressMsg::Started { index: i, label }).ok();
+                        }
                         let fetch_outcome = runner.run_jj_fetch(path);
+                        if let Some(tx) = progress {
+                            tx.send(ProgressMsg::Finished { index: i }).ok();
+                        }
                         let fetch_status = match fetch_outcome {
                             Ok(ref out) if out.changed => FetchStatus::Changed,
                             Ok(_) => FetchStatus::Unchanged,
@@ -506,7 +554,22 @@ pub fn run(
     let runner = ProcessRunner {
         idle_timeout: opts.idle_timeout,
     };
-    let results = run_with_results(config_path, &runner, opts)?;
+
+    let is_tty = std::io::stdout().is_terminal();
+    let (progress_tx, display_handle) = if is_tty {
+        let (tx, rx) = mpsc::sync_channel(PARALLEL_LIMIT * 2);
+        let handle = thread::spawn(|| progress_display_loop(rx));
+        (Some(tx), Some(handle))
+    } else {
+        (None, None)
+    };
+
+    let results = run_with_results(config_path, &runner, opts, progress_tx.as_ref())?;
+
+    drop(progress_tx);
+    if let Some(handle) = display_handle {
+        handle.join().unwrap_or(());
+    }
 
     display_results(&results, opts.verbose, out, err)?;
 
@@ -694,7 +757,7 @@ mod tests {
         );
 
         let runner = FakeRunner::new();
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -714,7 +777,7 @@ mod tests {
 
         let runner = FakeRunner::new().with_fail(repo_a.clone());
         // run_with_results does NOT return Err for individual failures
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         assert_eq!(results.len(), 2);
         let a = results.iter().find(|r| r.path == repo_a).unwrap();
         let b = results.iter().find(|r| r.path == repo_b).unwrap();
@@ -731,7 +794,7 @@ mod tests {
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
         let runner = FakeRunner::new().with_changed(repo_a);
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         assert_eq!(results.len(), 1);
         assert!(matches!(results[0].status, FetchStatus::Changed));
     }
@@ -748,7 +811,7 @@ mod tests {
         let runner = FakeRunner::new().with_fail(repo_a);
         // run() wraps run_with_results and bails on failures
         // We can't use run() with a fake runner via the public API, so test via run_with_results
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         let failures = results
             .iter()
             .filter(|r| matches!(r.status, FetchStatus::Failed(_)))
@@ -773,7 +836,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert_eq!(results.len(), 1);
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Rebased),
@@ -800,7 +863,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::ConflictsUndone),
             "expected ConflictsUndone, got {:?}",
@@ -828,7 +891,7 @@ mod tests {
             with_conflicts: true,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::RebasedWithConflicts),
             "expected RebasedWithConflicts, got {:?}",
@@ -858,7 +921,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Rebased),
             "expected Rebased, got {:?}",
@@ -885,7 +948,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Skipped),
             "expected Skipped, got {:?}",
@@ -912,7 +975,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Failed(_)),
             "expected Failed, got {:?}",
@@ -929,7 +992,7 @@ mod tests {
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
         let runner = FakeRunner::new();
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Skipped),
             "expected Skipped, got {:?}",
@@ -1042,7 +1105,7 @@ mod tests {
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
         let runner = FakeRunner::new().with_timeout(repo_a);
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         assert_eq!(results.len(), 1);
         assert!(
             matches!(results[0].status, FetchStatus::TimedOut),
@@ -1066,7 +1129,7 @@ mod tests {
             with_conflicts: false,
             idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
         };
-        let results = run_with_results(&config_path, &runner, &opts).unwrap();
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
             matches!(results[0].rebase_status, RebaseStatus::Skipped),
             "expected Skipped after timeout, got {:?}",
@@ -1116,7 +1179,7 @@ mod tests {
         let runner = FakeRunner::new()
             .with_timeout(repo_a.clone())
             .with_changed(repo_b.clone());
-        let results = run_with_results(&config_path, &runner, &no_rebase()).unwrap();
+        let results = run_with_results(&config_path, &runner, &no_rebase(), None).unwrap();
         let a = results.iter().find(|r| r.path == repo_a).unwrap();
         let b = results.iter().find(|r| r.path == repo_b).unwrap();
         assert!(matches!(a.status, FetchStatus::TimedOut));
