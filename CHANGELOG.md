@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-16
+
+### Added
+
+- Rebase runs even when fetch fails or times out — partial successes are still rebased
+
+### Changed
+
+- `jgl fetch` output is now an aligned table instead of a flat list
+- Rebase shows `no-op` instead of `rebased` when nothing changed
+
 ## [0.4.0] - 2026-04-15
 
 ### Added
@@ -53,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic short labels for each repo (disambiguated by path suffix when names collide)
 - `--verbose` / `-v` flag on `jgl fetch` to show full jj output per repository
 
-[Unreleased]: https://github.com/omarkohl/jgl/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/omarkohl/jgl/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/omarkohl/jgl/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/omarkohl/jgl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/omarkohl/jgl/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/omarkohl/jgl/compare/v0.2.0...v0.3.0
