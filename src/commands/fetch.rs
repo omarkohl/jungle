@@ -157,9 +157,11 @@ pub trait CommandRunner: Sync {
     /// # Errors
     /// Returns an error if the command fails or cannot be spawned.
     fn run_jj_fetch(&self, dir: &Path) -> Result<FetchOutput>;
+    /// Returns `true` if the rebase moved at least one commit, `false` if it
+    /// was a no-op.
     /// # Errors
     /// Returns an error if the rebase command fails.
-    fn run_jj_rebase(&self, dir: &Path) -> Result<()>;
+    fn run_jj_rebase(&self, dir: &Path) -> Result<bool>;
     /// Returns the change IDs of all conflicted commits.
     /// # Errors
     /// Returns an error if the jj command fails.
@@ -205,14 +207,16 @@ impl CommandRunner for ProcessRunner {
         }
     }
 
-    fn run_jj_rebase(&self, dir: &Path) -> Result<()> {
+    fn run_jj_rebase(&self, dir: &Path) -> Result<bool> {
         let output = std::process::Command::new("jj")
             .args(["rebase", "-b", "@", "-o", "trunk()"])
             .current_dir(dir)
             .output()
             .map_err(|e| anyhow::anyhow!("failed to spawn jj: {e}"))?;
         if output.status.success() {
-            Ok(())
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let changed = !stderr.contains("Nothing changed.");
+            Ok(changed)
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
             anyhow::bail!("jj rebase failed in {}: {stderr}", dir.display())
@@ -285,6 +289,7 @@ pub enum FetchStatus {
 #[derive(Debug)]
 pub enum RebaseStatus {
     Skipped,
+    Unchanged,
     Rebased,
     RebasedWithConflicts,
     ConflictsUndone,
@@ -458,8 +463,13 @@ fn do_rebase(runner: &impl CommandRunner, dir: &Path, with_conflicts: bool) -> R
         Err(e) => return RebaseStatus::Failed(e.to_string()),
     };
 
-    if let Err(e) = runner.run_jj_rebase(dir) {
-        return RebaseStatus::Failed(e.to_string());
+    let changed = match runner.run_jj_rebase(dir) {
+        Ok(c) => c,
+        Err(e) => return RebaseStatus::Failed(e.to_string()),
+    };
+
+    if !changed {
+        return RebaseStatus::Unchanged;
     }
 
     let conflicts_after = match runner.run_jj_conflicts(dir) {
@@ -499,6 +509,7 @@ const fn rebase_priority(s: &RebaseStatus) -> u8 {
         RebaseStatus::RebasedWithConflicts => 4,
         RebaseStatus::ConflictsUndone => 3,
         RebaseStatus::Rebased => 2,
+        RebaseStatus::Unchanged => 1,
         RebaseStatus::Skipped => 0,
     }
 }
@@ -522,6 +533,7 @@ const fn rebase_symbol(s: &RebaseStatus) -> (char, &'static str) {
         RebaseStatus::RebasedWithConflicts => ('!', "yellow"),
         RebaseStatus::ConflictsUndone => ('U', "yellow"),
         RebaseStatus::Rebased => ('+', "green"),
+        RebaseStatus::Unchanged => ('·', "dim"),
         RebaseStatus::Skipped => (' ', ""),
     }
 }
@@ -571,7 +583,7 @@ const fn rebase_legend_text(c: char) -> &'static str {
         '!' => "conflicts kept",
         'U' => "undone due to conflicts",
         '+' => "rebased",
-        '·' => "unchanged",
+        '·' => "no-op",
         _ => "?",
     }
 }
@@ -755,6 +767,10 @@ pub fn display_results(
         .iter()
         .filter(|r| matches!(r.status, FetchStatus::Unchanged))
         .count();
+    let rebase_unchanged = results
+        .iter()
+        .filter(|r| matches!(r.rebase_status, RebaseStatus::Unchanged))
+        .count();
     let rebase_rebased = results
         .iter()
         .filter(|r| matches!(r.rebase_status, RebaseStatus::Rebased))
@@ -784,6 +800,9 @@ pub fn display_results(
     }
     if fetch_unchanged > 0 {
         summary_parts.push(format!("{fetch_unchanged} unchanged"));
+    }
+    if rebase_unchanged > 0 {
+        summary_parts.push(format!("{rebase_unchanged} rebase no-op"));
     }
     if rebase_rebased > 0 {
         summary_parts.push(format!("{rebase_rebased} rebased"));
@@ -950,7 +969,7 @@ mod tests {
             })
         }
 
-        fn run_jj_rebase(&self, dir: &Path) -> Result<()> {
+        fn run_jj_rebase(&self, dir: &Path) -> Result<bool> {
             self.calls
                 .lock()
                 .unwrap()
@@ -958,7 +977,8 @@ mod tests {
             if self.rebase_fail_paths.iter().any(|p| p == dir) {
                 anyhow::bail!("simulated rebase failure");
             }
-            Ok(())
+            let changed = self.changed_paths.iter().any(|p| p == dir);
+            Ok(changed)
         }
 
         fn run_jj_conflicts(&self, dir: &Path) -> Result<Vec<String>> {
@@ -1103,7 +1123,33 @@ mod tests {
         std::fs::create_dir_all(&repo_a).unwrap();
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
+        // No changes → rebase is a no-op
         let runner = FakeRunner::new();
+        let opts = FetchOptions {
+            verbose: false,
+            rebase: true,
+            with_conflicts: false,
+            idle_timeout: Duration::from_secs(DEFAULT_IDLE_TIMEOUT_SECS),
+        };
+        let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(results[0].rebase_status, RebaseStatus::Unchanged),
+            "expected Unchanged, got {:?}",
+            results[0].rebase_status
+        );
+    }
+
+    #[test]
+    fn rebase_after_fetch_with_changes() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("config.toml");
+        let repo_a = tmp.path().join("repo_a");
+        std::fs::create_dir_all(&repo_a).unwrap();
+        write_config(&config_path, &[repo_a.to_str().unwrap()]);
+
+        // Fetch changed → rebase should report Rebased
+        let runner = FakeRunner::new().with_changed(repo_a);
         let opts = FetchOptions {
             verbose: false,
             rebase: true,
@@ -1127,10 +1173,12 @@ mod tests {
         std::fs::create_dir_all(&repo_a).unwrap();
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
-        let runner = FakeRunner::new().with_conflict_responses(vec![
-            vec![],                       // before: no conflicts
-            vec!["change123".to_owned()], // after: new conflict
-        ]);
+        let runner = FakeRunner::new()
+            .with_changed(repo_a.clone())
+            .with_conflict_responses(vec![
+                vec![],                       // before: no conflicts
+                vec!["change123".to_owned()], // after: new conflict
+            ]);
         let opts = FetchOptions {
             verbose: false,
             rebase: true,
@@ -1157,8 +1205,9 @@ mod tests {
         std::fs::create_dir_all(&repo_a).unwrap();
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
-        let runner =
-            FakeRunner::new().with_conflict_responses(vec![vec![], vec!["change123".to_owned()]]);
+        let runner = FakeRunner::new()
+            .with_changed(repo_a.clone())
+            .with_conflict_responses(vec![vec![], vec!["change123".to_owned()]]);
         let opts = FetchOptions {
             verbose: false,
             rebase: true,
@@ -1185,10 +1234,12 @@ mod tests {
         std::fs::create_dir_all(&repo_a).unwrap();
         write_config(&config_path, &[repo_a.to_str().unwrap()]);
 
-        let runner = FakeRunner::new().with_conflict_responses(vec![
-            vec!["preexisting".to_owned()],
-            vec!["preexisting".to_owned()],
-        ]);
+        let runner = FakeRunner::new()
+            .with_changed(repo_a.clone())
+            .with_conflict_responses(vec![
+                vec!["preexisting".to_owned()],
+                vec!["preexisting".to_owned()],
+            ]);
         let opts = FetchOptions {
             verbose: false,
             rebase: true,
@@ -1224,8 +1275,11 @@ mod tests {
         };
         let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
-            matches!(results[0].rebase_status, RebaseStatus::Rebased),
-            "expected Rebased despite fetch failure, got {:?}",
+            matches!(
+                results[0].rebase_status,
+                RebaseStatus::Rebased | RebaseStatus::Unchanged
+            ),
+            "expected rebase to run despite fetch failure, got {:?}",
             results[0].rebase_status
         );
         assert!(
@@ -1371,8 +1425,11 @@ mod tests {
         };
         let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
-            matches!(results[0].rebase_status, RebaseStatus::Rebased),
-            "expected Rebased despite timeout, got {:?}",
+            matches!(
+                results[0].rebase_status,
+                RebaseStatus::Rebased | RebaseStatus::Unchanged
+            ),
+            "expected rebase to run despite timeout, got {:?}",
             results[0].rebase_status
         );
         assert!(
