@@ -427,11 +427,7 @@ pub fn run_with_results(
                             Err(ref e) => FetchStatus::Failed(e.to_string()),
                         };
 
-                        let rebase_status = if opts.rebase
-                            && !matches!(
-                                fetch_status,
-                                FetchStatus::Failed(_) | FetchStatus::TimedOut
-                            ) {
+                        let rebase_status = if opts.rebase {
                             do_rebase(runner, path, opts.with_conflicts)
                         } else {
                             RebaseStatus::Skipped
@@ -491,13 +487,13 @@ fn do_rebase(runner: &impl CommandRunner, dir: &Path, with_conflicts: bool) -> R
 const fn rebase_suffix(fetch: &FetchStatus, rebase: &RebaseStatus) -> &'static str {
     match rebase {
         RebaseStatus::Skipped => "",
-        // Only annotate a clean rebase when the fetch actually brought in changes;
+        // Annotate rebase when the fetch brought in changes, failed, or timed out;
         // "unchanged (rebased)" looks contradictory when the rebase was a no-op.
         RebaseStatus::Rebased => {
-            if matches!(fetch, FetchStatus::Changed) {
-                " (rebased)"
-            } else {
+            if matches!(fetch, FetchStatus::Unchanged) {
                 ""
+            } else {
+                " (rebased)"
             }
         }
         RebaseStatus::RebasedWithConflicts => " (rebased, conflicts kept)",
@@ -934,7 +930,7 @@ mod tests {
     }
 
     #[test]
-    fn rebase_skipped_on_fetch_failure() {
+    fn rebase_runs_despite_fetch_failure() {
         let tmp = TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
         let repo_a = tmp.path().join("repo_a");
@@ -950,13 +946,13 @@ mod tests {
         };
         let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
-            matches!(results[0].rebase_status, RebaseStatus::Skipped),
-            "expected Skipped, got {:?}",
+            matches!(results[0].rebase_status, RebaseStatus::Rebased),
+            "expected Rebased despite fetch failure, got {:?}",
             results[0].rebase_status
         );
         assert!(
-            !runner.was_called(&Call::Rebase(repo_a)),
-            "expected rebase NOT to be called"
+            runner.was_called(&Call::Rebase(repo_a)),
+            "expected rebase to be called even after fetch failure"
         );
     }
 
@@ -1115,7 +1111,7 @@ mod tests {
     }
 
     #[test]
-    fn rebase_skipped_on_timeout() {
+    fn rebase_runs_despite_timeout() {
         let tmp = TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
         let repo_a = tmp.path().join("repo_a");
@@ -1131,13 +1127,13 @@ mod tests {
         };
         let results = run_with_results(&config_path, &runner, &opts, None).unwrap();
         assert!(
-            matches!(results[0].rebase_status, RebaseStatus::Skipped),
-            "expected Skipped after timeout, got {:?}",
+            matches!(results[0].rebase_status, RebaseStatus::Rebased),
+            "expected Rebased despite timeout, got {:?}",
             results[0].rebase_status
         );
         assert!(
-            !runner.was_called(&Call::Rebase(repo_a)),
-            "expected rebase NOT to be called after timeout"
+            runner.was_called(&Call::Rebase(repo_a)),
+            "expected rebase to be called even after timeout"
         );
     }
 
