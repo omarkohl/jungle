@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-17
+
+### Fixed
+
+- Use `map_or` instead of `map().unwrap_or()` to satisfy new clippy lint in Rust 1.95
+
 ## [0.5.0] - 2026-04-16
 
 ### Added
