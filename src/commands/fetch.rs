@@ -132,8 +132,7 @@ fn spawn_with_idle_timeout(
             Ok(None) => {
                 let idle = last_activity
                     .lock()
-                    .map(|ts| ts.elapsed())
-                    .unwrap_or(Duration::ZERO);
+                    .map_or(Duration::ZERO, |ts| ts.elapsed());
                 if idle >= idle_timeout {
                     // Kill and reap
                     let _ = child.kill();
