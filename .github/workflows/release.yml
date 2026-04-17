@@ -9,7 +9,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
   build:
+    needs: check
     strategy:
       matrix:
         include:
