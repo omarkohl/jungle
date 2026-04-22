@@ -179,7 +179,12 @@ impl CommandRunner for ProcessRunner {
         let refs_before = git_remote_refs(dir)?;
 
         let mut cmd = std::process::Command::new("jj");
-        cmd.args(["git", "fetch"]).current_dir(dir);
+        cmd.args(["git", "fetch"])
+            .current_dir(dir)
+            // Prevent git from opening /dev/tty for credential prompts. Without
+            // this, a killed process (e.g. idle timeout) leaves the terminal in
+            // no-echo mode because SIGKILL bypasses any cleanup handlers.
+            .env("GIT_TERMINAL_PROMPT", "0");
 
         let output = if self.idle_timeout.is_zero() {
             cmd.output()
