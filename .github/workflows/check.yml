@@ -22,4 +22,4 @@ jobs:
         with:
           tool: jj-cli
       - run: cargo nextest run
-      - uses: EmbarkStudios/cargo-deny-action@v2.0.16
+      - uses: EmbarkStudios/cargo-deny-action@v2.0.17
