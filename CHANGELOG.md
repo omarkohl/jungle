@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-30
+
+Version jump from v0.5.x to v1.3.0 to signal production readiness. v1.0.0 was skipped as it can paradoxically look unfinished.
+
+### Fixed
+
+- Prevent terminal corruption when a fetch times out — `GIT_TERMINAL_PROMPT=0` stops git from opening `/dev/tty` for credential prompts, which previously left the console in a broken state after SIGKILL
+
 ## [0.5.1] - 2026-04-17
 
 ### Fixed
@@ -70,7 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic short labels for each repo (disambiguated by path suffix when names collide)
 - `--verbose` / `-v` flag on `jgl fetch` to show full jj output per repository
 
-[Unreleased]: https://github.com/omarkohl/jgl/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/omarkohl/jgl/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/omarkohl/jgl/compare/v0.5.1...v1.3.0
+[0.5.1]: https://github.com/omarkohl/jgl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/omarkohl/jgl/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/omarkohl/jgl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/omarkohl/jgl/compare/v0.3.0...v0.3.1
